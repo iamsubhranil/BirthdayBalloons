@@ -190,6 +190,14 @@
         },
       };
 
+      function randomInRange(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      function randomIntInRange(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
       function randomGiftShape(x, y, color) {
         const shapes = ["box", "circle", "star", "balloon"];
         const scores = [20, 15, 25, 10]; // Corresponding scores for each shape
@@ -343,8 +351,7 @@
         const minTime = 7,
           maxTime = 10;
 
-        const balloonDuration =
-          (minTime + Math.random() * (maxTime - minTime)) * 1000;
+        const balloonDuration = randomInRange(minTime, maxTime) * 1000;
 
         balloons.push({
           group: g,
@@ -396,7 +403,9 @@
         count = 1,
         orig_x = -1,
         orig_y = -1,
-        color = null
+        color = null,
+        right = null,
+        bottom = null
       ) {
         for (let i = 0; i < count; i++) {
           const rect = document.createElementNS(svgNS, "rect");
@@ -409,9 +418,13 @@
 
           if (orig_x == -1) {
             x = Math.random() * window.innerWidth;
+          } else if (count > 1 && right) {
+            x = randomInRange(orig_x, right);
           }
           if (orig_y == -1) {
             y = -40; // spawn a bit higher
+          } else if (count > 1 && bottom) {
+            y = randomInRange(orig_y, bottom);
           }
 
           confettiGroup.appendChild(rect);
@@ -461,9 +474,7 @@
 
         const minParticles = 18;
         const maxParticles = 25;
-        const particles =
-          Math.floor(Math.random() * (maxParticles - minParticles + 1)) +
-          minParticles;
+        const particles = randomIntInRange(minParticles, maxParticles);
         const radius = 20 + Math.random() * 40;
         const overshoot = radius * 1.15; // Overshoot distance
         const color = randomColor();
@@ -605,7 +616,7 @@
         if (gameStarted) {
           var countMin = 5;
           var countMax = 5;
-          count = countMin + Math.floor(Math.random() * (countMax - countMin));
+          count = randomIntInRange(countMin, countMax);
         }
         for (let i = 0; i < count; i++) spawnBalloon();
       }, 200 + Math.random() * 2000);
@@ -710,16 +721,21 @@
           }
         }
 
-        // Spawn a burst of confetti at balloon position for each color
-        const transform = balloonGroupElem.getAttribute("transform");
-        const match = /translate\(([^,]+),\s*([^)]+)\)/.exec(transform);
-        if (match) {
-          const x = parseFloat(match[1]);
-          const y = parseFloat(match[2]);
-          colors.forEach((color) => {
-            spawnConfetti(10, x, y, color);
-          });
-        }
+        const elementBoundingBox = balloonGroupElem.getBoundingClientRect();
+        const left = elementBoundingBox.left;
+        const right = elementBoundingBox.right;
+        const top = elementBoundingBox.top;
+        const bottom = elementBoundingBox.bottom;
+        colors.forEach((color) => {
+          spawnConfetti(
+            randomIntInRange(5, 10),
+            left,
+            top,
+            color,
+            right,
+            bottom
+          );
+        });
       }
     </script>
   </body>
