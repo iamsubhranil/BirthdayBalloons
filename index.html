@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Happy Birthday Animation</title>
+    <title>Happy Birthday!</title>
     <style>
       body {
         margin: 0;
@@ -488,6 +488,7 @@
 
       // Timers
       var spawnBalloonEvent = setInterval(() => {
+        if (document.hidden) return;
         var count = 1;
         if (gameStarted) {
           var countMin = 5;
@@ -497,6 +498,7 @@
         for (let i = 0; i < count; i++) spawnBalloon();
       }, 200 + Math.random() * 2000);
       setInterval(() => {
+        if (document.hidden) return;
         if (!gameStarted) spawnConfetti(Math.floor(Math.random() * 10) + 2);
       }, 300);
 
@@ -515,7 +517,9 @@
       const letterDelay = 0.25; // seconds
       const spaceDelay = letterDelay * 2; // seconds for spaces
       const parts = birthdayString.split(" ");
-      const spaceWidth = 20; // Width of space between words
+      const spaceWidth = 0.25; // Width of space between words
+      var lastElem = null;
+      var lastSpace = null;
       parts.forEach((part, index) => {
         const div = document.createElement("div");
         div.classList.add("childrenDiv");
@@ -528,17 +532,26 @@
           delay += letterDelay;
         }
         textElem.appendChild(div);
+        if (lastElem && lastSpace) {
+          if (
+            lastElem.getBoundingClientRect().top ==
+            div.getBoundingClientRect().top
+          ) {
+            lastSpace.style.width = spaceWidth + "em";
+          }
+        }
+        lastElem = div;
         if (index < parts.length - 1) {
           // Add a space element between words
           const spaceDiv = document.createElement("div");
           const space = document.createElement("p");
           space.classList.add("letter");
           space.textContent = " "; // Just a space character
-          space.style.width = spaceWidth; // Adjust space width as needed
           space.style.animationDelay = `${delay}s`;
           spaceDiv.appendChild(space);
           textElem.appendChild(spaceDiv);
           delay += spaceDelay;
+          lastSpace = space;
         }
       });
 
