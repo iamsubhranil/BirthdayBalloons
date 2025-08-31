@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Happy Birthday Animation</title>
+    <style>
+      body {
+        margin: 0;
+        background: #111;
+        overflow: hidden;
+      }
+      svg {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+      }
+      .letter {
+        font-family: "Imperial Script", "Brush Script MT", cursive;
+        font-size: 200px;
+        color: #fff;
+        opacity: 0;
+        background: none;
+        animation: drawLetter 0.5s cubic-bezier(0.77, 0, 0.175, 1) forwards;
+        margin: 0px;
+      }
+
+      .parentDiv {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 100vw;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        color: white;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-content: center;
+      }
+
+      .childrenDiv {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: auto;
+      }
+
+      @keyframes drawLetter {
+        0% {
+          opacity: 0;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+    </style>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Imperial+Script&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- Replace the static <text> block with this script-generated version -->
+    <div style="position: relative; width: 100vw; height: 100vh" id="root">
+      <svg
+        id="scene"
+        style="position: absolute; top: 0; left: 0; width: 100vw; height: 100vh"
+      >
+        <g id="balloons"></g>
+        <g id="confetti"></g>
+        <!-- SVG text can go here -->
+      </svg>
+
+      <div id="birthdayText" class="parentDiv"></div>
+      <div
+        id="scoreBoard"
+        style="
+          position: absolute;
+          top: 20px;
+          left: 20px;
+          color: white;
+          font-size: 2em;
+          display: none;
+        "
+      >
+        Score: 0
+      </div>
+      <div
+        id="timeBoard"
+        style="
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          color: white;
+          font-size: 2em;
+          display: none;
+        "
+      >
+        Time: 0s
+      </div>
+
+      <!-- Final score display -->
+      <div
+        id="finalScore"
+        style="
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          color: white;
+          font-size: 4.5em;
+          display: none;
+          text-align: center;
+        "
+      >
+        Final Score: 0
+      </div>
+    </div>
+    <script>
+      const svgNS = "http://www.w3.org/2000/svg";
+      const balloonGroup = document.getElementById("balloons");
+      const confettiGroup = document.getElementById("confetti");
+
+      // Gradient generator for balloons
+      function createGradient(id) {
+        const defs =
+          document.querySelector("svg defs") ||
+          document.createElementNS(svgNS, "defs");
+        if (!defs.parentNode) document.querySelector("svg").appendChild(defs);
+
+        const linearGradient = document.createElementNS(
+          svgNS,
+          "linearGradient"
+        );
+        linearGradient.setAttribute("id", id);
+        linearGradient.setAttribute("x1", "0%");
+        linearGradient.setAttribute("y1", "0%");
+        linearGradient.setAttribute("x2", "100%");
+        linearGradient.setAttribute("y2", "100%");
+
+        const stop1 = document.createElementNS(svgNS, "stop");
+        stop1.setAttribute("offset", "0%");
+        stop1.setAttribute("stop-color", randomColor());
+
+        const stop2 = document.createElementNS(svgNS, "stop");
+        stop2.setAttribute("offset", "100%");
+        stop2.setAttribute("stop-color", randomColor());
+
+        linearGradient.appendChild(stop1);
+        linearGradient.appendChild(stop2);
+
+        defs.appendChild(linearGradient);
+        return `url(#${id})`;
+      }
+
+      function randomColor() {
+        return `hsl(${Math.random() * 360}, 80%, 60%)`;
+      }
+
+      const balloons = [];
+      var gameStarted = false;
+      var gameState = {
+        balloonsPopped: 0,
+        score: 0,
+        totalTime: 30,
+        timeLeft: 30,
+        balloonSpeedMultiplier: 1,
+        lastGameEnded: null,
+        gapBeforeRestart: 10, // seconds
+      };
+      const config = {
+        balloon: {
+          randomId: () => Math.random().toString(36).substr(2, 9),
+          minRx: 35,
+          maxRx: 45,
+          ryProportion: 1.2, // ry = rx * proportion
+          cx: 0,
+          cy: 0,
+          spawnYOffset: 150,
+        },
+        lace: {
+          startY: 38,
+          controlXMultiplier: 10,
+          controlXOffset: 5,
+          controlYOffset: 15,
+          endXMultiplier: 10,
+          endXOffset: 5,
+          endYOffset: 25,
+        },
+      };
+      function spawnBalloon() {
+        const g = document.createElementNS(svgNS, "g");
+
+        const gradientId = "grad" + config.balloon.randomId();
+        const balloon = document.createElementNS(svgNS, "ellipse");
+        balloon.setAttribute("rx", config.balloon.minRx);
+        balloon.setAttribute(
+          "ry",
+          config.balloon.minRx * config.balloon.ryProportion
+        );
+        balloon.setAttribute("cx", config.balloon.cx);
+        balloon.setAttribute("cy", config.balloon.cy);
+        balloon.setAttribute("fill", createGradient(gradientId));
+
+        // Lace
+        const lace = document.createElementNS(svgNS, "path");
+        const startY = config.lace.startY;
+        const controlX =
+          Math.random() * config.lace.controlXMultiplier -
+          config.lace.controlXOffset;
+        const controlY = startY + config.lace.controlYOffset;
+        const endX =
+          Math.random() * config.lace.endXMultiplier - config.lace.endXOffset;
+        const endY = startY + config.lace.endYOffset;
+        lace.setAttribute(
+          "d",
+          `M 0 ${startY} Q ${controlX} ${controlY}, ${endX} ${endY}`
+        );
+        lace.setAttribute("stroke", "#555");
+        lace.setAttribute("stroke-width", 2);
+        lace.setAttribute("fill", "none");
+
+        g.appendChild(balloon);
+        g.appendChild(lace);
+
+        balloonGroup.appendChild(g);
+
+        const x = Math.random() * window.innerWidth;
+        const y = window.innerHeight + config.balloon.spawnYOffset; // spawn further below the screen
+
+        // Calculate speed so balloon travels (window.innerHeight + 150) pixels in 5–7 seconds
+        const minTime = 7,
+          maxTime = 10;
+
+        const balloonDuration =
+          (minTime + Math.random() * (maxTime - minTime)) * 1000;
+
+        balloons.push({
+          group: g,
+          baseX: x,
+          y: y,
+          startTime: -1,
+          duration: balloonDuration / gameState.balloonSpeedMultiplier,
+          speedMultiplier: gameState.balloonSpeedMultiplier,
+          amplitude: 30 + Math.random() * 20,
+          frequency: 0.0015 + Math.random() * 0.001,
+          phase: Math.random() * Math.PI * 2,
+          pop: function () {
+            popBalloon(g, balloon, lace, balloon.getAttribute("fill"), this);
+            this.popped = true;
+          },
+          popped: false,
+        });
+      }
+
+      function animateBalloons(time) {
+        const totalHeight = window.innerHeight + 150;
+        balloons.forEach((b) => {
+          if (b.popped) return; // Skip popped balloons
+          if (b.startTime < 0) {
+            b.startTime = time;
+          }
+          b.y =
+            -(totalHeight / b.duration) * (time - b.startTime) + totalHeight;
+          // Sway effect
+          const dx = Math.sin(time * b.frequency + b.phase) * b.amplitude;
+          b.group.setAttribute(
+            "transform",
+            `translate(${b.baseX + dx}, ${b.y})`
+          );
+        });
+
+        for (let i = balloons.length - 1; i >= 0; i--) {
+          if (balloons[i].y < -100) {
+            balloonGroup.removeChild(balloons[i].group);
+            balloons.splice(i, 1);
+          }
+        }
+      }
+
+      // Confetti
+      const confettis = [];
+      function spawnConfetti(
+        count = 1,
+        orig_x = -1,
+        orig_y = -1,
+        color = null
+      ) {
+        for (let i = 0; i < count; i++) {
+          const rect = document.createElementNS(svgNS, "rect");
+          rect.setAttribute("width", 6);
+          rect.setAttribute("height", 12);
+          rect.setAttribute("fill", color ? color : randomColor());
+
+          var x = orig_x;
+          var y = orig_y;
+
+          if (orig_x == -1) {
+            x = Math.random() * window.innerWidth;
+          }
+          if (orig_y == -1) {
+            y = -40; // spawn a bit higher
+          }
+
+          confettiGroup.appendChild(rect);
+
+          confettis.push({
+            el: rect,
+            x: x,
+            y: y,
+            vy: Math.random() * 1 + 0.5,
+            vx: Math.random() * 0.5 - 0.25,
+            ay: 0.02 + Math.random() * 0.02,
+            floatTime: Math.random() * 60 + 30,
+          });
+        }
+      }
+
+      function animateConfetti() {
+        confettis.forEach((c, idx) => {
+          if (c.floatTime > 0) {
+            c.floatTime--;
+            c.y += 0.2;
+            c.x += c.vx * 0.5;
+          } else {
+            c.vy += c.ay;
+            c.y += c.vy;
+            c.x += c.vx;
+          }
+          c.el.setAttribute(
+            "transform",
+            `translate(${c.x}, ${c.y}) rotate(${c.y % 360})`
+          );
+        });
+
+        for (let i = confettis.length - 1; i >= 0; i--) {
+          if (confettis[i].y > window.innerHeight + 100) {
+            confettiGroup.removeChild(confettis[i].el);
+            confettis.splice(i, 1);
+          }
+        }
+      }
+
+      // Fireworks logic
+      function spawnFirework(x, y) {
+        const svg = document.getElementById("scene");
+        const group = document.createElementNS(svgNS, "g");
+        group.setAttribute("class", "firework");
+
+        const minParticles = 18;
+        const maxParticles = 25;
+        const particles =
+          Math.floor(Math.random() * (maxParticles - minParticles + 1)) +
+          minParticles;
+        const radius = 20 + Math.random() * 40;
+        const overshoot = radius * 1.15; // Overshoot distance
+        const color = randomColor();
+
+        for (let i = 0; i < particles; i++) {
+          const angle = (2 * Math.PI * i) / particles;
+          const line = document.createElementNS(svgNS, "line");
+          line.setAttribute("x1", x);
+          line.setAttribute("y1", y);
+          line.setAttribute("x2", x);
+          line.setAttribute("y2", y);
+          line.setAttribute("stroke", color);
+          line.setAttribute("stroke-width", 4);
+          line.setAttribute("opacity", 1);
+          group.appendChild(line);
+
+          // Animate each line outward from center, overshoot, then settle
+          let progress = 0;
+          const duration = 200 + Math.random() * 200; // ms for line to reach overshoot
+          const settleDuration = 100; // ms to settle back to radius
+          const startTime = performance.now();
+
+          function animateLine(now) {
+            const elapsed = now - startTime;
+            if (elapsed < duration) {
+              // Progressively extend the line
+              progress = elapsed / duration;
+              const currentLength = progress * overshoot;
+              line.setAttribute("x2", x + Math.cos(angle) * currentLength);
+              line.setAttribute("y2", y + Math.sin(angle) * currentLength);
+              line.setAttribute("opacity", 0.7 + 0.2 * progress);
+              requestAnimationFrame(animateLine);
+            }
+          }
+          requestAnimationFrame(animateLine);
+
+          // Fade out after explosion
+          setTimeout(() => {
+            line.setAttribute("opacity", 0);
+            spawnConfetti(
+              1,
+              x + Math.cos(angle) * radius,
+              y + Math.sin(angle) * radius,
+              color
+            );
+          }, 900 + Math.random() * 400);
+        }
+
+        svg.appendChild(group);
+
+        // Remove firework group after animation
+        setTimeout(() => {
+          if (group.parentNode) group.parentNode.removeChild(group);
+        }, 1600);
+      }
+
+      function initGameState() {
+        if (
+          !gameStarted &&
+          gameState.lastGameEnded &&
+          Date.now() - gameState.lastGameEnded <
+            gameState.gapBeforeRestart * 1000
+        ) {
+          // Prevent starting a new game within 1 second of the last game ending
+          return;
+        }
+        gameStarted = true;
+        gameState.timeLeft = gameState.totalTime;
+        gameState.score = 0;
+        gameState.balloonsPopped = 0;
+        gameState.balloonSpeedMultiplier = 1;
+        document.getElementById("scoreBoard").style.display = "block";
+        document.getElementById("timeBoard").style.display = "block";
+        document.getElementById("finalScore").style.display = "none";
+        document.getElementById("birthdayText").style.display = "none";
+        // Start game timer
+        const timerInterval = setInterval(() => {
+          if (gameState.timeLeft > 0) {
+            gameState.timeLeft--;
+            document.getElementById("timeBoard").innerText =
+              "Time: " + gameState.timeLeft + "s";
+          } else {
+            clearInterval(timerInterval);
+            document.getElementById("finalScore").style.display = "block";
+            document.getElementById("finalScore").innerText =
+              "Final Score: " + gameState.score;
+            // Reset game state
+            gameStarted = false;
+            gameState.balloonsPopped = 0;
+            gameState.score = 0;
+            gameState.timeLeft = gameState.totalTime;
+            gameState.lastGameEnded = Date.now();
+            gameState.balloonSpeedMultiplier = 1;
+            setTimeout(() => {
+              document.getElementById("scoreBoard").style.display = "none";
+              document.getElementById("scoreBoard").innerText = "Score: 0";
+              document.getElementById("timeBoard").style.display = "none";
+              document.getElementById("finalScore").style.display = "none";
+              document.getElementById("birthdayText").style.display = "flex";
+            }, (gameState.gapBeforeRestart * 1000) / 2); // Hide score after half interval
+          }
+        }, 1000);
+      }
+
+      // Listen for clicks to spawn fireworks
+      document.getElementById("root").addEventListener("click", function (e) {
+        const rect = this.getBoundingClientRect();
+        // Check if the rect collides with any balloon
+        var balloonPopped = false;
+        balloons.forEach((b) => {
+          if (b.popped) return; // Skip already popped balloons
+          const balloonRect = b.group.getBoundingClientRect();
+          const relaxedPadding = 40 + gameState.balloonSpeedMultiplier * 7; // Allow some padding for easier clicking
+
+          if (
+            e.clientX > balloonRect.left - relaxedPadding &&
+            e.clientX < balloonRect.right + relaxedPadding &&
+            e.clientY > balloonRect.top - relaxedPadding &&
+            e.clientY < balloonRect.bottom + relaxedPadding
+          ) {
+            if (!gameStarted) {
+              initGameState();
+            }
+            // Clicked on a balloon, pop it instead
+            b.pop();
+            balloonPopped = true;
+          }
+        });
+        if (balloonPopped || gameStarted) return; // Don't spawn firework if a balloon was popped
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        spawnFirework(x, y);
+      });
+
+      // Timers
+      var spawnBalloonEvent = setInterval(() => {
+        var count = 1;
+        if (gameStarted) {
+          var countMin = 5;
+          var countMax = 5;
+          count = countMin + Math.floor(Math.random() * (countMax - countMin));
+        }
+        for (let i = 0; i < count; i++) spawnBalloon();
+      }, 200 + Math.random() * 2000);
+      setInterval(() => {
+        if (!gameStarted) spawnConfetti(Math.floor(Math.random() * 10) + 2);
+      }, 300);
+
+      // Main loop
+      function animate(time) {
+        animateBalloons(time);
+        animateConfetti();
+        requestAnimationFrame(animate);
+      }
+      requestAnimationFrame(animate);
+
+      // Draw "Happy Birthday" letter by letter with animation delays
+      const birthdayString = "Happy Birthday!";
+      const textElem = document.getElementById("birthdayText");
+      let delay = 0;
+      const letterDelay = 0.25; // seconds
+      const spaceDelay = letterDelay * 2; // seconds for spaces
+      const parts = birthdayString.split(" ");
+      const spaceWidth = 20; // Width of space between words
+      parts.forEach((part, index) => {
+        const div = document.createElement("div");
+        div.classList.add("childrenDiv");
+        for (let i = 0; i < part.length; i++) {
+          const tspan = document.createElement("p");
+          tspan.classList.add("letter");
+          tspan.setAttribute("style", `animation-delay: ${delay}s`);
+          tspan.textContent = part[i];
+          div.appendChild(tspan);
+          delay += letterDelay;
+        }
+        textElem.appendChild(div);
+        if (index < parts.length - 1) {
+          // Add a space element between words
+          const spaceDiv = document.createElement("div");
+          const space = document.createElement("p");
+          space.classList.add("letter");
+          space.textContent = " "; // Just a space character
+          space.style.width = spaceWidth; // Adjust space width as needed
+          space.style.animationDelay = `${delay}s`;
+          spaceDiv.appendChild(space);
+          textElem.appendChild(spaceDiv);
+          delay += spaceDelay;
+        }
+      });
+
+      function popBalloon(
+        balloonGroupElem,
+        balloonElem,
+        laceElem,
+        gradientFill,
+        balloonObject
+      ) {
+        // Pop animation: scale up and fade out
+        balloonElem.setAttribute(
+          "style",
+          "transition: transform 0.3s, opacity 0.3s; transform: scale(1.3); opacity: 0;"
+        );
+        laceElem.setAttribute("style", "transition: opacity 0.3s; opacity: 0;");
+
+        if (gameStarted) {
+          gameState.balloonsPopped++;
+          gameState.balloonSpeedMultiplier =
+            1 + gameState.balloonsPopped * 0.04;
+          gameState.score += 10 + Math.ceil(balloonObject.speedMultiplier * 2); // More points for faster balloons
+          document.getElementById("scoreBoard").innerText =
+            "Score: " + gameState.score;
+        }
+
+        // Extract all gradient colors for confetti
+        let colors = ["#fff"];
+        if (gradientFill && gradientFill.startsWith("url(")) {
+          const gradId = gradientFill.match(/url\(#(.*?)\)/)[1];
+          const grad = document.getElementById(gradId);
+          if (grad) {
+            const stops = grad.querySelectorAll("stop");
+            if (stops.length) {
+              colors = Array.from(stops).map((stop) =>
+                stop.getAttribute("stop-color")
+              );
+            }
+          }
+        }
+
+        // Spawn a burst of confetti at balloon position for each color
+        const transform = balloonGroupElem.getAttribute("transform");
+        const match = /translate\(([^,]+),\s*([^)]+)\)/.exec(transform);
+        if (match) {
+          const x = parseFloat(match[1]);
+          const y = parseFloat(match[2]);
+          colors.forEach((color) => {
+            spawnConfetti(10, x, y, color);
+          });
+        }
+      }
+    </script>
+  </body>
+</html>
